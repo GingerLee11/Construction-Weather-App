@@ -40,47 +40,55 @@ def flag_hourly_hazards(df, thresholds):
 
 def flag_daily_hazards(df_hourly):
     """
-    Aggregates to daily hazard flags: any_hour and four_hour.
+    For each day, count hazard hours by type.
+    Returns a daily DataFrame with columns: date, year, month, day, [hazard_hr...], total_hazard_hr.
     """
     df_hourly = df_hourly.copy()
     df_hourly['date'] = pd.to_datetime(df_hourly['dt_iso']).dt.date
-    group = df_hourly.groupby('date')['is_hazard']
-    daily = pd.DataFrame({
-        'any_hour_flag': group.any(),
-        'four_hour_flag': group.sum() >= 4
-    }).reset_index()
+
+    hazard_types = [
+        'is_wind_hazard', 'is_heat_hazard', 'is_cold_hazard',
+        'is_rain_1h_hazard', 'is_rain_3h_hazard',
+        'is_snow_1h_hazard', 'is_snow_3h_hazard'
+    ]
+
+    agg = {
+        h: 'sum' for h in hazard_types
+    }
+    agg['is_hazard'] = 'sum'  # Total hours any hazard
+
+    daily = df_hourly.groupby('date').agg(agg).reset_index()
     daily['year'] = pd.to_datetime(daily['date']).dt.year
     daily['month'] = pd.to_datetime(daily['date']).dt.month
     daily['day'] = pd.to_datetime(daily['date']).dt.day
-    log.info("Aggregated daily hazard flags for %d days.", len(daily))
+    log.info("Aggregated daily hazard hours for %d days.", len(daily))
     return daily
 
 def forecast_hazards(daily, start_date, end_date, min_year=1979, max_year=2024):
     """
-    For each day in the given (future) window, computes historical probability of hazard.
-    For Jan 2, 2025, uses Jan 2 of all past years 1979–2024.
-    Returns DataFrame [date, p_any, p_four, n_years].
+    For each day in forecast window, compute mean hazard hours by type across all years.
     """
+    hazard_cols = [
+        'is_wind_hazard', 'is_heat_hazard', 'is_cold_hazard',
+        'is_rain_1h_hazard', 'is_rain_3h_hazard',
+        'is_snow_1h_hazard', 'is_snow_3h_hazard', 'is_hazard'
+    ]
     window_dates = pd.date_range(start=start_date, end=end_date, freq='D')
     out = []
     for dt in window_dates:
         m, d = dt.month, dt.day
-        mask = (daily['month'] == m) & (daily['day'] == d) & \
-               (daily['year'] >= min_year) & (daily['year'] <= max_year)
-        subset = daily[mask]
+        subset = daily[(daily['month'] == m) & (daily['day'] == d) &
+                       (daily['year'] >= min_year) & (daily['year'] <= max_year)]
         n_years = subset['year'].nunique()
-        p_any = subset['any_hour_flag'].mean() if n_years > 0 else np.nan
-        p_four = subset['four_hour_flag'].mean() if n_years > 0 else np.nan
-        out.append({
+        stats = {col.replace("is_", "").replace("_hazard", "_hr"): subset[col].mean() if n_years > 0 else np.nan
+                 for col in hazard_cols}
+        row = {
             'date': dt.date(),
-            'p_any': p_any,
-            'p_four': p_four,
-            'n_years': n_years
-        })
-        log.info(
-            "Forecast for %s: n_years=%d, p_any=%.3f, p_four=%.3f",
-            dt.date(), n_years, p_any if n_years else np.nan, p_four if n_years else np.nan
-        )
+            'n_years': n_years,
+            **stats
+        }
+        out.append(row)
+        log.info("Forecast for %s: %s", dt.date(), row)
     return pd.DataFrame(out)
 
 if __name__ == "__main__":
@@ -93,17 +101,11 @@ if __name__ == "__main__":
         'rain_3h': 1.0,
         'snow_1h': 0.5,
         'snow_3h': 1.5,
-        # No thunderstorm!
     }
     df = pd.read_csv("data/Historical Weather Plainview TX CLEANED.csv", parse_dates=['dt_iso'])
     log.info("Loaded %d rows from hourly data.", len(df))
-
     df = flag_hourly_hazards(df, thresholds)
     daily = flag_daily_hazards(df)
-
-    # Example: Forecast for Jan 1–Jan 10, 2025
-    forecast = forecast_hazards(
-        daily, start_date="2025-01-01", end_date="2025-01-10", min_year=1979, max_year=2024
-    )
+    forecast = forecast_hazards(daily, start_date="2025-01-01", end_date="2025-01-10")
     print(forecast)
     log.info("Forecast window complete.")
