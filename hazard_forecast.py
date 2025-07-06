@@ -15,6 +15,15 @@ logging.basicConfig(
 )
 log = logging.getLogger()
 
+
+def filter_working_hours(df, work_start=7, work_end=17):
+    """Keep only rows within working hours (e.g., 7:00–16:59)."""
+    df = df.copy()
+    df['hour'] = pd.to_datetime(df['dt_iso']).dt.hour
+    filtered = df[(df['hour'] >= work_start) & (df['hour'] < work_end)]
+    log.info("Filtered to working hours %02d:00–%02d:00; %d rows remain.", work_start, work_end, len(filtered))
+    return filtered
+
 def flag_hourly_hazards(df, thresholds):
     """
     Flags hourly hazards based on thresholds.
@@ -102,8 +111,14 @@ if __name__ == "__main__":
         'snow_1h': 0.5,
         'snow_3h': 1.5,
     }
+    # User can change these as needed
+    work_start = 7
+    work_end = 17
+
     df = pd.read_csv("data/Historical Weather Plainview TX CLEANED.csv", parse_dates=['dt_iso'])
     log.info("Loaded %d rows from hourly data.", len(df))
+
+    df = filter_working_hours(df, work_start=work_start, work_end=work_end)
     df = flag_hourly_hazards(df, thresholds)
     daily = flag_daily_hazards(df)
     forecast = forecast_hazards(daily, start_date="2025-01-01", end_date="2025-01-10")
