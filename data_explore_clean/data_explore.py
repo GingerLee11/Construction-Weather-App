@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 log = logging.getLogger()
 
-FILENAME = 'Historical Weather Plainview TX.csv'
+FILENAME = 'data\Historical Weather Plainview TX CLEANED.csv'
 log.info("Reading CSV...")
 df = pd.read_csv(FILENAME, low_memory=False)
 
