@@ -42,3 +42,27 @@ plt.savefig("thunderstorm_days_per_month.png")
 plt.close()
 
 print("Saved: thunderstorm_hours_per_month.png, thunderstorm_days_per_month.png")
+
+# Earliest thunderstorm record
+ts = df[df['is_thunderstorm']]
+if not ts.empty:
+    print("Earliest thunderstorm record:", ts['dt_iso'].min())
+    print("Sample record:", ts.iloc[0])
+else:
+    print("No thunderstorm records found.")
+
+# Year counts
+print(ts['dt_iso'].dt.year.value_counts().sort_index())
+
+# Thunderstorm by weather_id
+df['is_thunderstorm_id'] = df['weather_id'].between(200, 299)
+# Compare with is_thunderstorm
+print("Thunderstorm by ID:", df['is_thunderstorm_id'].sum())
+print("Earliest thunderstorm (ID):", df[df['is_thunderstorm_id']]['dt_iso'].min())
+
+df['year'] = df['dt_iso'].dt.year
+ts_by_year = df.groupby('year')['is_thunderstorm'].sum()
+ts_by_year.plot(kind='bar', figsize=(10,4))
+plt.title('Thunderstorm Hours by Year')
+plt.show()
+
