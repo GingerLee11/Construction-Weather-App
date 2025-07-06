@@ -27,12 +27,12 @@ def filter_working_hours(df, work_start=7, work_end=17):
 def flag_hourly_hazards(df, thresholds):
     """
     Flags hourly hazards based on thresholds.
-    Thunderstorms are NOT included.
+    Uses feels_like for cold/heat.
     """
     df = df.copy()
     df['is_wind_hazard'] = df['wind_speed'] >= thresholds.get('wind_speed', 28)
-    df['is_heat_hazard'] = df['temp'] >= thresholds.get('temp_heat', 80)
-    df['is_cold_hazard'] = df['temp'] <= thresholds.get('temp_cold', 32)
+    df['is_heat_hazard'] = df['feels_like'] >= thresholds.get('temp_heat', 80)
+    df['is_cold_hazard'] = df['feels_like'] <= thresholds.get('temp_cold', 32)
     df['is_rain_1h_hazard'] = df['rain_1h'].fillna(0) >= thresholds.get('rain_1h', 0.25)
     df['is_rain_3h_hazard'] = df['rain_3h'].fillna(0) >= thresholds.get('rain_3h', 1.0)
     df['is_snow_1h_hazard'] = df['snow_1h'].fillna(0) >= thresholds.get('snow_1h', 0.5)
